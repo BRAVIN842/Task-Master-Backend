@@ -54,3 +54,32 @@ def login():
 
     access_token = create_access_token(identity=user.id)
     return jsonify({'access_token': access_token}), 200
+
+# Create a task
+@app.route('/tasks', methods=['POST'])
+@jwt_required()
+def create_task():
+    data = request.json
+    title = data.get('title')
+    description = data.get('description')
+    deadline_str = data.get('deadline')
+    progress = data.get('progress', 0)  # Default progress is 0
+    priority = data.get('priority', 'normal')  # Default priority is 'normal'
+    user_id = get_jwt_identity()
+
+    if not title or not description or not deadline_str:
+        return jsonify({'message': 'Title, description, and deadline are required'}), 400
+
+    try:
+        deadline = datetime.strptime(deadline_str, '%Y-%m-%d')
+    except ValueError:
+        return jsonify({'message': 'Invalid deadline format. Use YYYY-MM-DD'}), 400
+
+    # Set the default value of completed as False (no)
+    completed = False
+
+    task = Task(title=title, description=description, deadline=deadline, progress=progress, priority=priority, completed=completed, user_id=user_id)
+    db.session.add(task)
+    db.session.commit()
+
+    return jsonify({'message': 'Task created successfully', 'task': {'id': task.id, 'title': task.title, 'description': task.description, 'deadline': task.deadline, 'progress': task.progress, 'priority': task.priority, 'completed': task.completed, 'created_at': task.created_at}}), 201
