@@ -108,3 +108,38 @@ def get_all_tasks():
 
     return jsonify({'tasks': tasks_data}), 200
 
+# Update a task
+@app.route('/tasks/<int:task_id>', methods=['PATCH'])
+@jwt_required()
+def update_task(task_id):
+    task = Task.query.get(task_id)
+    if not task:
+        return jsonify({'message': 'Task not found'}), 404
+
+    data = request.json
+    title = data.get('title')
+    description = data.get('description')
+    deadline_str = data.get('deadline')
+    progress = data.get('progress')
+    priority = data.get('priority')
+
+    if title:
+        task.title = title
+    if description:
+        task.description = description
+    if deadline_str:
+        try:
+            task.deadline = datetime.strptime(deadline_str, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({'message': 'Invalid deadline format. Use YYYY-MM-DD'}), 400
+    if progress is not None:
+        task.progress = progress
+    if priority:
+        task.priority = priority
+
+    # Don't forget to set completed to False if it's not provided in the request
+    task.completed = data.get('completed', False)
+
+    db.session.commit()
+
+    return jsonify({'message': 'Task updated successfully'}), 200
