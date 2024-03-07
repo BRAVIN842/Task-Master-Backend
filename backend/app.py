@@ -9,12 +9,14 @@ from datetime import datetime
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['JWT_SECRET_KEY'] = 'super-secret'
+app.config['JWT_SECRET_KEY'] = 'super-secret'  
 
 db.init_app(app)
 bcrypt = Bcrypt(app)
 jwt = JWTManager(app)
 CORS(app)
+
+# Continue with endpoints and other configurations
 
 @app.route('/register', methods=['POST'])
 def register():
@@ -85,11 +87,16 @@ def create_task():
     return jsonify({'message': 'Task created successfully', 'task': {'id': task.id, 'title': task.title, 'description': task.description, 'deadline': task.deadline, 'progress': task.progress, 'priority': task.priority, 'completed': task.completed, 'created_at': task.created_at}}), 201
 
 @app.route('/tasks', methods=['GET'])
-def get_all_tasks():
-    tasks = Task.query.all()
-    tasks_data = []
+@jwt_required()
+def get_user_tasks():
+    user_id = get_jwt_identity()  # Get the ID of the authenticated user
 
-    for task in tasks:
+    # Query all tasks associated with the authenticated user
+    user_tasks = Task.query.filter_by(user_id=user_id).all()
+
+    # Construct a list of task data
+    tasks_data = []
+    for task in user_tasks:
         task_comments = [{'id': comment.id, 'text': comment.text, 'created_at': comment.created_at, 'user_id': comment.user_id} for comment in task.comments]
         task_data = {
             'id': task.id,
@@ -101,16 +108,24 @@ def get_all_tasks():
             'priority': task.priority,
             'completed': task.completed,
             'user_id': task.user_id,
-            'group_leader_id': task.group_leader_id,  # Include group_leader_id here
+            'group_leader_id': task.group_leader_id,
             'comments': task_comments
         }
         tasks_data.append(task_data)
 
     return jsonify({'tasks': tasks_data}), 200
 
+from flask_jwt_extended import jwt_required, get_jwt_identity
+
 @app.route('/tasks/<int:task_id>', methods=['GET'])
-def get_task_by_id(task_id):
-    task = Task.query.get_or_404(task_id)
+@jwt_required()
+def get_task_by_id_endpoint(task_id):
+    user_id = get_jwt_identity()  # Get the ID of the authenticated user
+
+    # Query the task by ID and user ID
+    task = Task.query.filter_by(id=task_id, user_id=user_id).first_or_404()
+
+    # Construct task data as before
     task_comments = [{'id': comment.id, 'text': comment.text, 'created_at': comment.created_at, 'user_id': comment.user_id} for comment in task.comments]
     task_data = {
         'id': task.id,
@@ -122,18 +137,18 @@ def get_task_by_id(task_id):
         'priority': task.priority,
         'completed': task.completed,
         'user_id': task.user_id,
-        'group_leader_id': task.group_leader_id,  # Include group_leader_id here
+        'group_leader_id': task.group_leader_id,
         'comments': task_comments
     }
     
     return jsonify({'task': task_data}), 200
 
-
 # Update a task
 @app.route('/tasks/<int:task_id>', methods=['PATCH'])
 @jwt_required()
 def update_task(task_id):
-    task = Task.query.get(task_id)
+    user_id = get_jwt_identity()
+    task = Task.query.filter_by(id=task_id, user_id=user_id).first()
     if not task:
         return jsonify({'message': 'Task not found'}), 404
 
@@ -169,14 +184,65 @@ def update_task(task_id):
 @app.route('/tasks/<int:task_id>', methods=['DELETE'])
 @jwt_required()
 def delete_task(task_id):
-    task = Task.query.get(task_id)
+    user_id = get_jwt_identity()
+    task = Task.query.filter_by(id=task_id, user_id=user_id).first()
     if not task:
         return jsonify({'message': 'Task not found'}), 404
 
+    # Delete associated comments
+    Comment.query.filter_by(task_id=task_id).delete()
+
+    # Delete the task
     db.session.delete(task)
     db.session.commit()
 
-    return jsonify({'message': 'Task deleted successfully'}), 200
+    return jsonify({'message': 'Task and associated comments deleted successfully'}), 200
+
+@app.route('/all-tasks', methods=['GET'])
+def get_all_tasks():
+    tasks = Task.query.all()
+    tasks_data = []
+
+    for task in tasks:
+        task_comments = [{'id': comment.id, 'text': comment.text, 'created_at': comment.created_at, 'user_id': comment.user_id} for comment in task.comments]
+        task_data = {
+            'id': task.id,
+            'title': task.title,
+            'description': task.description,
+            'created_at': task.created_at,
+            'deadline': task.deadline,
+            'progress': task.progress,
+            'priority': task.priority,
+            'completed': task.completed,
+            'user_id': task.user_id,
+            'group_leader_id': task.group_leader_id,  # Include group_leader_id here
+            'comments': task_comments
+        }
+        tasks_data.append(task_data)
+
+    return jsonify({'tasks': tasks_data}), 200
+
+# Assuming Task model has a column named 'group_leader_id'
+
+@app.route('/all-tasks/<int:task_id>', methods=['GET'])
+def get_task_by_id(task_id):
+    task = Task.query.get_or_404(task_id)
+    task_comments = [{'id': comment.id, 'text': comment.text, 'created_at': comment.created_at, 'user_id': comment.user_id} for comment in task.comments]
+    task_data = {
+        'id': task.id,
+        'title': task.title,
+        'description': task.description,
+        'created_at': task.created_at,
+        'deadline': task.deadline,
+        'progress': task.progress,
+        'priority': task.priority,
+        'completed': task.completed,
+        'user_id': task.user_id,
+        'group_leader_id': task.group_leader_id,  # Include group_leader_id here
+        'comments': task_comments
+    }
+    
+    return jsonify({'task': task_data}), 200
 
 # Get user profile
 @app.route('/users/profile', methods=['GET'])
@@ -202,14 +268,41 @@ def update_user_profile():
     username = data.get('username')
     profile_image = data.get('profile_image')
 
-    if username:
-        user.username = username
+    # Ensure that the user can only update their own profile
+    if username and user.username != username:
+        return jsonify({'message': 'You are not authorized to update this profile'}), 403
+
     if profile_image:
         user.profile_image = profile_image
 
     db.session.commit()
 
     return jsonify({'message': 'User profile updated successfully'}), 200
+
+# Promote a user to group leader
+@app.route('/users/<int:user_id>/promote', methods=['PATCH'])
+@jwt_required()
+def promote_to_group_leader(user_id):
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'message': 'User not found'}), 404
+
+    # Check if the user is already a group leader
+    if user.group_leader_id is not None:
+        return jsonify({'message': 'User is already a group leader'}), 400
+
+    # Create a new GroupLeader instance with the user's information
+    group_leader = GroupLeader(username=user.username, email=user.email, password=user.password, profile_image=user.profile_image)
+    db.session.add(group_leader)
+
+    # Assign the new GroupLeader to the user
+    user.group_leader = group_leader
+
+    # Commit the changes to the database
+    db.session.commit()
+
+    return jsonify({'message': 'User promoted to group leader'}), 200
+
 
 # Create a comment
 @app.route('/comments', methods=['POST'])
@@ -258,24 +351,107 @@ def delete_comment(comment_id):
 
     return jsonify({'message': 'Comment deleted successfully'}), 200
 
-# Promote a user to group leader
-@app.route('/users/<int:user_id>/promote', methods=['PATCH'])
+# Edit a task assigned by a group leader to a user
+@app.route('/group_leaders/<int:group_leader_id>/users/<int:user_id>/tasks/<int:task_id>', methods=['PATCH'])
 @jwt_required()
-def promote_to_group_leader(user_id):
+def edit_task_assigned_by_group_leader(group_leader_id, user_id, task_id):
+    data = request.json
+
+    # Check if the user belongs to the group leader
     user = User.query.get(user_id)
-    if not user:
-        return jsonify({'message': 'User not found'}), 404
+    if not user or user.group_leader_id != group_leader_id:
+        return jsonify({'message': 'User not found or does not belong to this group leader'}), 404
 
-    # Check if the user is already a group leader
-    if user.group_leader_id is not None:
-        return jsonify({'message': 'User is already a group leader'}), 400
+    # Get the task
+    task = Task.query.get(task_id)
+    if not task:
+        return jsonify({'message': 'Task not found'}), 404
 
-    # Promote the user to group leader
-    group_leader = GroupLeader()
-    user.group_leader = group_leader
+    # Update task attributes
+    if 'title' in data:
+        task.title = data['title']
+    if 'description' in data:
+        task.description = data['description']
+    if 'deadline' in data:
+        try:
+            deadline = datetime.strptime(data['deadline'], '%Y-%m-%d')
+        except ValueError:
+            return jsonify({'message': 'Invalid deadline format. Use YYYY-MM-DD'}), 400
+        task.deadline = deadline
+    if 'progress' in data:
+        task.progress = data['progress']
+    if 'priority' in data:
+        task.priority = data['priority']
+    if 'completed' in data:
+        task.completed = data['completed']
+
     db.session.commit()
 
-    return jsonify({'message': 'User promoted to group leader'}), 200
+    return jsonify({'message': 'Task updated successfully'}), 200
+
+# Delete a task assigned by a group leader to a user
+@app.route('/group_leaders/<int:group_leader_id>/users/<int:user_id>/tasks/<int:task_id>', methods=['DELETE'])
+@jwt_required()
+def delete_task_assigned_by_group_leader(group_leader_id, user_id, task_id):
+    # Check if the user belongs to the group leader
+    user = User.query.get(user_id)
+    if not user or user.group_leader_id != group_leader_id:
+        return jsonify({'message': 'User not found or does not belong to this group leader'}), 404
+
+    # Get the task
+    task = Task.query.get(task_id)
+    if not task:
+        return jsonify({'message': 'Task not found'}), 404
+
+    # Delete associated comments first
+    Comment.query.filter_by(task_id=task_id).delete()
+
+    # Delete the task
+    db.session.delete(task)
+    db.session.commit()
+
+    return jsonify({'message': 'Task deleted successfully'}), 200
+
+
+# Get users assigned by a group leader
+@app.route('/group_leaders/<int:group_leader_id>/users', methods=['GET'])
+@jwt_required()
+def get_users_assigned_by_group_leader(group_leader_id):
+    # Get users assigned by the group leader
+    users = User.query.filter_by(group_leader_id=group_leader_id).all()
+    users_data = [{'id': user.id, 'username': user.username, 'email': user.email, 'profile_image': user.profile_image} for user in users]
+
+    return jsonify({'users': users_data}), 200
+
+# Get tasks assigned by a group leader to all users
+@app.route('/group_leaders/<int:group_leader_id>/tasks', methods=['GET'])
+@jwt_required()
+def get_tasks_assigned_by_group_leader(group_leader_id):
+    # Get tasks assigned by the group leader to all users
+    tasks = Task.query.join(User).filter(User.group_leader_id == group_leader_id).all()
+    tasks_data = [{'id': task.id, 'title': task.title, 'description': task.description, 'deadline': task.deadline, 'progress': task.progress, 'priority': task.priority, 'completed': task.completed, 'created_at': task.created_at} for task in tasks]
+
+    return jsonify({'tasks': tasks_data}), 200
+
+
+# Update a group leader (demote to normal user)
+@app.route('/group_leaders/<int:group_leader_id>', methods=['PATCH'])
+@jwt_required()
+def update_group_leader(group_leader_id):
+    group_leader = GroupLeader.query.get(group_leader_id)
+    if not group_leader:
+        return jsonify({'message': 'Group leader not found'}), 404
+
+    # Update the group leader to a normal user by removing them from the GroupLeader table
+    user = User.query.filter_by(group_leader_id=group_leader_id).first()
+    if user:
+        user.group_leader_id = None  # Remove the group leader association
+        db.session.commit()
+
+    db.session.delete(group_leader)  # Remove them as a group leader
+    db.session.commit()
+
+    return jsonify({'message': 'Group leader demoted to normal user'}), 200
 
 # Assign multiple users to a group leader
 @app.route('/group_leaders/<int:group_leader_id>/assign_users', methods=['POST'])
@@ -407,103 +583,6 @@ def group_leader_get_task_by_id(group_leader_id, user_id, task_id):
     }
     return jsonify({'task': task_data}), 200
 
-# Get users assigned by a group leader
-@app.route('/group_leaders/<int:group_leader_id>/users', methods=['GET'])
-@jwt_required()
-def get_users_assigned_by_group_leader(group_leader_id):
-    # Get users assigned by the group leader
-    users = User.query.filter_by(group_leader_id=group_leader_id).all()
-    users_data = [{'id': user.id, 'username': user.username, 'email': user.email, 'profile_image': user.profile_image} for user in users]
-
-    return jsonify({'users': users_data}), 200
-
-# Get tasks assigned by a group leader to all users
-@app.route('/group_leaders/<int:group_leader_id>/tasks', methods=['GET'])
-@jwt_required()
-def get_tasks_assigned_by_group_leader(group_leader_id):
-    # Get tasks assigned by the group leader to all users
-    tasks = Task.query.join(User).filter(User.group_leader_id == group_leader_id).all()
-    tasks_data = [{'id': task.id, 'title': task.title, 'description': task.description, 'deadline': task.deadline, 'progress': task.progress, 'priority': task.priority, 'completed': task.completed, 'created_at': task.created_at} for task in tasks]
-
-    return jsonify({'tasks': tasks_data}), 200
-
-# Edit a task assigned by a group leader to a user
-@app.route('/group_leaders/<int:group_leader_id>/users/<int:user_id>/tasks/<int:task_id>', methods=['PATCH'])
-@jwt_required()
-def edit_task_assigned_by_group_leader(group_leader_id, user_id, task_id):
-    data = request.json
-
-    # Check if the user belongs to the group leader
-    user = User.query.get(user_id)
-    if not user or user.group_leader_id != group_leader_id:
-        return jsonify({'message': 'User not found or does not belong to this group leader'}), 404
-
-    # Get the task
-    task = Task.query.get(task_id)
-    if not task:
-        return jsonify({'message': 'Task not found'}), 404
-
-    # Update task attributes
-    if 'title' in data:
-        task.title = data['title']
-    if 'description' in data:
-        task.description = data['description']
-    if 'deadline' in data:
-        try:
-            deadline = datetime.strptime(data['deadline'], '%Y-%m-%d')
-        except ValueError:
-            return jsonify({'message': 'Invalid deadline format. Use YYYY-MM-DD'}), 400
-        task.deadline = deadline
-    if 'progress' in data:
-        task.progress = data['progress']
-    if 'priority' in data:
-        task.priority = data['priority']
-    if 'completed' in data:
-        task.completed = data['completed']
-
-    db.session.commit()
-
-    return jsonify({'message': 'Task updated successfully'}), 200
-
-# Delete a task assigned by a group leader to a user
-@app.route('/group_leaders/<int:group_leader_id>/users/<int:user_id>/tasks/<int:task_id>', methods=['DELETE'])
-@jwt_required()
-def delete_task_assigned_by_group_leader(group_leader_id, user_id, task_id):
-    # Check if the user belongs to the group leader
-    user = User.query.get(user_id)
-    if not user or user.group_leader_id != group_leader_id:
-        return jsonify({'message': 'User not found or does not belong to this group leader'}), 404
-
-    # Get the task
-    task = Task.query.get(task_id)
-    if not task:
-        return jsonify({'message': 'Task not found'}), 404
-
-    # Delete the task
-    db.session.delete(task)
-    db.session.commit()
-
-    return jsonify({'message': 'Task deleted successfully'}), 200
-
-# Update a group leader (demote to normal user)
-@app.route('/group_leaders/<int:group_leader_id>', methods=['PATCH'])
-@jwt_required()
-def update_group_leader(group_leader_id):
-    group_leader = GroupLeader.query.get(group_leader_id)
-    if not group_leader:
-        return jsonify({'message': 'Group leader not found'}), 404
-
-    # Update the group leader to a normal user by removing them from the GroupLeader table
-    user = User.query.filter_by(group_leader_id=group_leader_id).first()
-    if user:
-        user.group_leader_id = None  # Remove the group leader association
-        db.session.commit()
-
-    db.session.delete(group_leader)  # Remove them as a group leader
-    db.session.commit()
-
-    return jsonify({'message': 'Group leader demoted to normal user'}), 200
-
 # Get all users
 @app.route('/users', methods=['GET'])
 def get_all_users():
@@ -533,6 +612,54 @@ def get_comment_by_id(comment_id):
     comment = Comment.query.get_or_404(comment_id)
     comment_data = {'id': comment.id, 'text': comment.text, 'created_at': comment.created_at, 'user_id': comment.user_id, 'task_id': comment.task_id}
     return jsonify({'comment': comment_data}), 200
+
+# Get all group leaders with detailed information
+@app.route('/group_leaders', methods=['GET'])
+@jwt_required()
+def get_all_group_leaders():
+    group_leaders = GroupLeader.query.all()
+    group_leaders_data = []
+
+    for group_leader in group_leaders:
+        # Retrieve group leader's associated users
+        users = group_leader.users
+        users_data = [{'id': user.id, 'username': user.username, 'email': user.email, 'profile_image': user.profile_image} for user in users]
+        
+        # Retrieve group leader's assigned tasks
+        tasks = group_leader.tasks
+        tasks_data = [{'id': task.id, 'title': task.title, 'description': task.description, 'deadline': task.deadline, 'progress': task.progress, 'priority': task.priority, 'completed': task.completed, 'created_at': task.created_at} for task in tasks]
+
+        group_leader_data = {
+            'id': group_leader.id,
+            'users': users_data,
+            'tasks': tasks_data
+        }
+        
+        group_leaders_data.append(group_leader_data)
+
+    return jsonify({'group_leaders': group_leaders_data}), 200
+
+# Get group leader by ID with detailed information
+@app.route('/group_leaders/<int:group_leader_id>', methods=['GET'])
+@jwt_required()
+def get_group_leader_by_id(group_leader_id):
+    group_leader = GroupLeader.query.get_or_404(group_leader_id)
+    
+    # Retrieve group leader's associated users
+    users = group_leader.users
+    users_data = [{'id': user.id, 'username': user.username, 'email': user.email, 'profile_image': user.profile_image} for user in users]
+    
+    # Retrieve group leader's assigned tasks
+    tasks = group_leader.tasks
+    tasks_data = [{'id': task.id, 'title': task.title, 'description': task.description, 'deadline': task.deadline, 'progress': task.progress, 'priority': task.priority, 'completed': task.completed, 'created_at': task.created_at} for task in tasks]
+    
+    group_leader_data = {
+        'id': group_leader.id,
+        'users': users_data,
+        'tasks': tasks_data
+    }
+    
+    return jsonify({'group_leader': group_leader_data}), 200
 
 # Logout (delete session)
 @app.route('/logout', methods=['DELETE'])
