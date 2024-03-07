@@ -15,3 +15,28 @@ db.init_app(app)
 bcrypt = Bcrypt(app)
 jwt = JWTManager(app)
 CORS(app)
+
+@app.route('/register', methods=['POST'])
+def register():
+    data = request.json
+    username = data.get('username')
+    email = data.get('email')
+    password = data.get('password')
+    profile_image = data.get('profile_image')  # Optional
+
+    if not username or not email or not password:
+        return jsonify({'message': 'Username, email, and password are required'}), 400
+
+    # Check if the email is already registered
+    if User.query.filter_by(email=email).first():
+        return jsonify({'message': 'Email already exists'}), 400
+
+    # Hash the password
+    hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
+
+    # Create the user
+    user = User(username=username, email=email, password=hashed_password, profile_image=profile_image)
+    db.session.add(user)
+    db.session.commit()
+
+    return jsonify({'message': 'User registered successfully'}), 201
