@@ -330,3 +330,79 @@ def group_leader_assign_tasks_to_user(group_leader_id, user_id):
     db.session.commit()
 
     return jsonify({'message': 'Tasks assigned to user successfully'}), 200
+
+# Get tasks assigned to users by a group leader
+@app.route('/group_leaders/<int:group_leader_id>/users/<int:user_id>/tasks', methods=['GET'])
+@jwt_required()
+def group_leader_get_tasks_assigned_to_user(group_leader_id, user_id):
+    # Check if the user belongs to the group leader
+    current_user_id = get_jwt_identity()
+    current_user = User.query.get(current_user_id)
+    if not current_user or current_user.group_leader_id != group_leader_id:
+        return jsonify({'message': 'Access denied. You are not authorized to perform this action.'}), 403
+
+    # Check if the specified user belongs to the group leader
+    user = User.query.get(user_id)
+    if not user or user.group_leader_id != group_leader_id:
+        return jsonify({'message': 'User not found or does not belong to this group leader'}), 404
+
+    # Get tasks assigned to the user
+    tasks = user.assigned_tasks
+    tasks_data = []
+
+    for task in tasks:
+        # Get comments for the task
+        task_comments = [{'id': comment.id, 'text': comment.text, 'created_at': comment.created_at, 'user_id': comment.user_id} for comment in task.comments]
+
+        task_data = {
+            'id': task.id,
+            'title': task.title,
+            'description': task.description,
+            'deadline': task.deadline,
+            'progress': task.progress,
+            'priority': task.priority,
+            'completed': task.completed,
+            'created_at': task.created_at,
+            'comments': task_comments  # Include comments for the task
+        }
+        tasks_data.append(task_data)
+
+    return jsonify({'tasks': tasks_data}), 200
+
+# Get tasks by Id assigned to users by a group leader
+@app.route('/group_leaders/<int:group_leader_id>/users/<int:user_id>/tasks/<int:task_id>', methods=['GET'])
+@jwt_required()
+def group_leader_get_task_by_id(group_leader_id, user_id, task_id):
+    # Check if the user making the request is authenticated and belongs to the specified group leader
+    current_user_id = get_jwt_identity()
+    current_user = User.query.get(current_user_id)
+    if not current_user or current_user.group_leader_id != group_leader_id:
+        return jsonify({'message': 'Access denied. You are not authorized to perform this action.'}), 403
+
+    # Check if the specified user belongs to the specified group leader
+    user = User.query.get(user_id)
+    if not user or user.group_leader_id != group_leader_id:
+        return jsonify({'message': 'User not found or does not belong to this group leader'}), 404
+
+    # Retrieve the task assigned to the specified user by its ID
+    task = Task.query.filter_by(id=task_id, user_id=user_id).first()
+    if not task:
+        return jsonify({'message': 'Task not found for the specified user'}), 404
+
+    # Retrieve comments associated with the task
+    comments = task.comments
+    comments_data = [{'id': comment.id, 'text': comment.text, 'created_at': comment.created_at, 'user_id': comment.user_id} for comment in comments]
+
+    # Serialize the task data along with comments and return it in the response
+    task_data = {
+        'id': task.id,
+        'title': task.title,
+        'description': task.description,
+        'deadline': task.deadline,
+        'progress': task.progress,
+        'priority': task.priority,
+        'completed': task.completed,
+        'created_at': task.created_at,
+        'comments': comments_data  # Include comments in the task data
+    }
+    return jsonify({'task': task_data}), 200
