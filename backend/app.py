@@ -485,3 +485,21 @@ def delete_task_assigned_by_group_leader(group_leader_id, user_id, task_id):
 
     return jsonify({'message': 'Task deleted successfully'}), 200
 
+# Update a group leader (demote to normal user)
+@app.route('/group_leaders/<int:group_leader_id>', methods=['PATCH'])
+@jwt_required()
+def update_group_leader(group_leader_id):
+    group_leader = GroupLeader.query.get(group_leader_id)
+    if not group_leader:
+        return jsonify({'message': 'Group leader not found'}), 404
+
+    # Update the group leader to a normal user by removing them from the GroupLeader table
+    user = User.query.filter_by(group_leader_id=group_leader_id).first()
+    if user:
+        user.group_leader_id = None  # Remove the group leader association
+        db.session.commit()
+
+    db.session.delete(group_leader)  # Remove them as a group leader
+    db.session.commit()
+
+    return jsonify({'message': 'Group leader demoted to normal user'}), 200
