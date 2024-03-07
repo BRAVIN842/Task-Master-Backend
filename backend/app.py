@@ -427,3 +427,61 @@ def get_tasks_assigned_by_group_leader(group_leader_id):
 
     return jsonify({'tasks': tasks_data}), 200
 
+# Edit a task assigned by a group leader to a user
+@app.route('/group_leaders/<int:group_leader_id>/users/<int:user_id>/tasks/<int:task_id>', methods=['PATCH'])
+@jwt_required()
+def edit_task_assigned_by_group_leader(group_leader_id, user_id, task_id):
+    data = request.json
+
+    # Check if the user belongs to the group leader
+    user = User.query.get(user_id)
+    if not user or user.group_leader_id != group_leader_id:
+        return jsonify({'message': 'User not found or does not belong to this group leader'}), 404
+
+    # Get the task
+    task = Task.query.get(task_id)
+    if not task:
+        return jsonify({'message': 'Task not found'}), 404
+
+    # Update task attributes
+    if 'title' in data:
+        task.title = data['title']
+    if 'description' in data:
+        task.description = data['description']
+    if 'deadline' in data:
+        try:
+            deadline = datetime.strptime(data['deadline'], '%Y-%m-%d')
+        except ValueError:
+            return jsonify({'message': 'Invalid deadline format. Use YYYY-MM-DD'}), 400
+        task.deadline = deadline
+    if 'progress' in data:
+        task.progress = data['progress']
+    if 'priority' in data:
+        task.priority = data['priority']
+    if 'completed' in data:
+        task.completed = data['completed']
+
+    db.session.commit()
+
+    return jsonify({'message': 'Task updated successfully'}), 200
+
+# Delete a task assigned by a group leader to a user
+@app.route('/group_leaders/<int:group_leader_id>/users/<int:user_id>/tasks/<int:task_id>', methods=['DELETE'])
+@jwt_required()
+def delete_task_assigned_by_group_leader(group_leader_id, user_id, task_id):
+    # Check if the user belongs to the group leader
+    user = User.query.get(user_id)
+    if not user or user.group_leader_id != group_leader_id:
+        return jsonify({'message': 'User not found or does not belong to this group leader'}), 404
+
+    # Get the task
+    task = Task.query.get(task_id)
+    if not task:
+        return jsonify({'message': 'Task not found'}), 404
+
+    # Delete the task
+    db.session.delete(task)
+    db.session.commit()
+
+    return jsonify({'message': 'Task deleted successfully'}), 200
+
