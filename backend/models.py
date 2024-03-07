@@ -35,3 +35,10 @@ class Comment(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     task_id = db.Column(db.Integer, db.ForeignKey('task.id'), nullable=False)
+
+class GroupLeader(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    tasks = db.relationship('Task', backref='group_leader', lazy=True)
+    users = db.relationship('User', backref='group_leader', lazy=True, foreign_keys='User.group_leader_id')
+    # Add a relationship back to Task
+    group_tasks = db.relationship('Task', backref='group_leader_assigned', lazy=True, foreign_keys='Task.group_leader_id')
