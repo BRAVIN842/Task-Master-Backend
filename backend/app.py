@@ -244,3 +244,16 @@ def update_comment(comment_id):
     db.session.commit()
 
     return jsonify({'message': 'Comment updated successfully'}), 200
+
+# Delete a comment
+@app.route('/comments/<int:comment_id>', methods=['DELETE'])
+@jwt_required()
+def delete_comment(comment_id):
+    comment = Comment.query.get(comment_id)
+    if not comment:
+        return jsonify({'message': 'Comment not found'}), 404
+
+    db.session.delete(comment)
+    db.session.commit()
+
+    return jsonify({'message': 'Comment deleted successfully'}), 200
