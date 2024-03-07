@@ -188,3 +188,25 @@ def get_user_profile():
         return jsonify({'message': 'User not found'}), 404
 
     return jsonify({'username': user.username, 'email': user.email, 'profile_image': user.profile_image}), 200
+
+# Update user profile
+@app.route('/users/profile', methods=['PATCH'])
+@jwt_required()
+def update_user_profile():
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'message': 'User not found'}), 404
+
+    data = request.json
+    username = data.get('username')
+    profile_image = data.get('profile_image')
+
+    if username:
+        user.username = username
+    if profile_image:
+        user.profile_image = profile_image
+
+    db.session.commit()
+
+    return jsonify({'message': 'User profile updated successfully'}), 200
