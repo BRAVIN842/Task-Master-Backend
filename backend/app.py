@@ -83,3 +83,28 @@ def create_task():
     db.session.commit()
 
     return jsonify({'message': 'Task created successfully', 'task': {'id': task.id, 'title': task.title, 'description': task.description, 'deadline': task.deadline, 'progress': task.progress, 'priority': task.priority, 'completed': task.completed, 'created_at': task.created_at}}), 201
+
+@app.route('/tasks', methods=['GET'])
+def get_all_tasks():
+    tasks = Task.query.all()
+    tasks_data = []
+
+    for task in tasks:
+        task_comments = [{'id': comment.id, 'text': comment.text, 'created_at': comment.created_at, 'user_id': comment.user_id} for comment in task.comments]
+        task_data = {
+            'id': task.id,
+            'title': task.title,
+            'description': task.description,
+            'created_at': task.created_at,
+            'deadline': task.deadline,
+            'progress': task.progress,
+            'priority': task.priority,
+            'completed': task.completed,
+            'user_id': task.user_id,
+            'group_leader_id': task.group_leader_id,  # Include group_leader_id here
+            'comments': task_comments
+        }
+        tasks_data.append(task_data)
+
+    return jsonify({'tasks': tasks_data}), 200
+
