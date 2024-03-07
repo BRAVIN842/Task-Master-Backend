@@ -533,3 +533,31 @@ def get_comment_by_id(comment_id):
     comment = Comment.query.get_or_404(comment_id)
     comment_data = {'id': comment.id, 'text': comment.text, 'created_at': comment.created_at, 'user_id': comment.user_id, 'task_id': comment.task_id}
     return jsonify({'comment': comment_data}), 200
+
+# Logout (delete session)
+@app.route('/logout', methods=['DELETE'])
+@jwt_required()
+def logout():
+    return jsonify({'message': 'Logged out successfully'}), 200
+
+@app.route('/delete_account', methods=['DELETE'])
+@jwt_required()
+def delete_account():
+    current_user_id = get_jwt_identity()
+
+    # Delete the user from the database
+    user = User.query.get(current_user_id)
+    if not user:
+        return jsonify({'message': 'User not found'}), 404
+
+    db.session.delete(user)
+    db.session.commit()
+
+    return jsonify({'message': 'Account deleted successfully'}), 200
+
+if __name__ == '__main__':
+    # Create all database tables
+    with app.app_context():
+        db.create_all()
+    app.run(debug=True, port=5552)
+
