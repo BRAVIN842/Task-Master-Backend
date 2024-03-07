@@ -108,6 +108,27 @@ def get_all_tasks():
 
     return jsonify({'tasks': tasks_data}), 200
 
+@app.route('/tasks/<int:task_id>', methods=['GET'])
+def get_task_by_id(task_id):
+    task = Task.query.get_or_404(task_id)
+    task_comments = [{'id': comment.id, 'text': comment.text, 'created_at': comment.created_at, 'user_id': comment.user_id} for comment in task.comments]
+    task_data = {
+        'id': task.id,
+        'title': task.title,
+        'description': task.description,
+        'created_at': task.created_at,
+        'deadline': task.deadline,
+        'progress': task.progress,
+        'priority': task.priority,
+        'completed': task.completed,
+        'user_id': task.user_id,
+        'group_leader_id': task.group_leader_id,  # Include group_leader_id here
+        'comments': task_comments
+    }
+    
+    return jsonify({'task': task_data}), 200
+
+
 # Update a task
 @app.route('/tasks/<int:task_id>', methods=['PATCH'])
 @jwt_required()
@@ -156,3 +177,4 @@ def delete_task(task_id):
     db.session.commit()
 
     return jsonify({'message': 'Task deleted successfully'}), 200
+
