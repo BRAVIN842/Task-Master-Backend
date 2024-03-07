@@ -178,3 +178,13 @@ def delete_task(task_id):
 
     return jsonify({'message': 'Task deleted successfully'}), 200
 
+# Get user profile
+@app.route('/users/profile', methods=['GET'])
+@jwt_required()
+def get_user_profile():
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'message': 'User not found'}), 404
+
+    return jsonify({'username': user.username, 'email': user.email, 'profile_image': user.profile_image}), 200
