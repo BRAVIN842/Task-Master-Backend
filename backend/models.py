@@ -38,7 +38,11 @@ class Comment(db.Model):
 
 class GroupLeader(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(100), unique=True, nullable=False)
+    email = db.Column(db.String(100), unique=True, nullable=False)
+    password = db.Column(db.String(100), nullable=False)
+    profile_image = db.Column(db.String(100))
+
     tasks = db.relationship('Task', backref='group_leader', lazy=True)
     users = db.relationship('User', backref='group_leader', lazy=True, foreign_keys='User.group_leader_id')
-    # Add a relationship back to Task
     group_tasks = db.relationship('Task', backref='group_leader_assigned', lazy=True, foreign_keys='Task.group_leader_id')
