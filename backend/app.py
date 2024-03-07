@@ -300,3 +300,33 @@ def assign_users_to_group_leader(group_leader_id):
     db.session.commit()
 
     return jsonify({'message': 'Users assigned to group leader successfully'}), 200
+
+# Assign multiple tasks to a user under a group leader
+@app.route('/group_leaders/<int:group_leader_id>/users/<int:user_id>/assign_tasks', methods=['POST'])
+@jwt_required()
+def group_leader_assign_tasks_to_user(group_leader_id, user_id):
+    # Check if the user is a group leader
+    current_user_id = get_jwt_identity()
+    current_user = User.query.get(current_user_id)
+    if not current_user or current_user.group_leader_id != group_leader_id:
+        return jsonify({'message': 'Access denied. You are not authorized to perform this action.'}), 403
+
+    data = request.json
+    task_ids = data.get('task_ids', [])
+
+    # Check if the user exists
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'message': 'User not found'}), 404
+
+    # Assign tasks to the user
+    for task_id in task_ids:
+        task = Task.query.get(task_id)
+        if task:
+            task.user_id = user_id
+        else:
+            return jsonify({'message': f'Task with ID {task_id} not found'}), 404
+
+    db.session.commit()
+
+    return jsonify({'message': 'Tasks assigned to user successfully'}), 200
