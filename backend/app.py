@@ -257,3 +257,22 @@ def delete_comment(comment_id):
     db.session.commit()
 
     return jsonify({'message': 'Comment deleted successfully'}), 200
+
+# Promote a user to group leader
+@app.route('/users/<int:user_id>/promote', methods=['PATCH'])
+@jwt_required()
+def promote_to_group_leader(user_id):
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'message': 'User not found'}), 404
+
+    # Check if the user is already a group leader
+    if user.group_leader_id is not None:
+        return jsonify({'message': 'User is already a group leader'}), 400
+
+    # Promote the user to group leader
+    group_leader = GroupLeader()
+    user.group_leader = group_leader
+    db.session.commit()
+
+    return jsonify({'message': 'User promoted to group leader'}), 200
