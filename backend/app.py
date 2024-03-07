@@ -406,3 +406,24 @@ def group_leader_get_task_by_id(group_leader_id, user_id, task_id):
         'comments': comments_data  # Include comments in the task data
     }
     return jsonify({'task': task_data}), 200
+
+# Get users assigned by a group leader
+@app.route('/group_leaders/<int:group_leader_id>/users', methods=['GET'])
+@jwt_required()
+def get_users_assigned_by_group_leader(group_leader_id):
+    # Get users assigned by the group leader
+    users = User.query.filter_by(group_leader_id=group_leader_id).all()
+    users_data = [{'id': user.id, 'username': user.username, 'email': user.email, 'profile_image': user.profile_image} for user in users]
+
+    return jsonify({'users': users_data}), 200
+
+# Get tasks assigned by a group leader to all users
+@app.route('/group_leaders/<int:group_leader_id>/tasks', methods=['GET'])
+@jwt_required()
+def get_tasks_assigned_by_group_leader(group_leader_id):
+    # Get tasks assigned by the group leader to all users
+    tasks = Task.query.join(User).filter(User.group_leader_id == group_leader_id).all()
+    tasks_data = [{'id': task.id, 'title': task.title, 'description': task.description, 'deadline': task.deadline, 'progress': task.progress, 'priority': task.priority, 'completed': task.completed, 'created_at': task.created_at} for task in tasks]
+
+    return jsonify({'tasks': tasks_data}), 200
+
