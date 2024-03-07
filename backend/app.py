@@ -503,3 +503,33 @@ def update_group_leader(group_leader_id):
     db.session.commit()
 
     return jsonify({'message': 'Group leader demoted to normal user'}), 200
+
+# Get all users
+@app.route('/users', methods=['GET'])
+def get_all_users():
+    users = User.query.all()
+    users_data = [{'id': user.id, 'username': user.username, 'email': user.email, 'profile_image': user.profile_image} for user in users]
+
+    return jsonify({'users': users_data}), 200
+
+# Get all comments
+@app.route('/comments', methods=['GET'])
+def get_all_comments():
+    comments = Comment.query.all()
+    comments_data = [{'id': comment.id, 'text': comment.text, 'created_at': comment.created_at, 'user_id': comment.user_id, 'task_id': comment.task_id} for comment in comments]
+
+    return jsonify({'comments': comments_data}), 200
+
+# Get user by ID
+@app.route('/users/<int:user_id>', methods=['GET'])
+def get_user_by_id(user_id):
+    user = User.query.get_or_404(user_id)
+    user_data = {'id': user.id, 'username': user.username, 'email': user.email, 'profile_image': user.profile_image}
+    return jsonify({'user': user_data}), 200
+
+# Get comment by ID
+@app.route('/comments/<int:comment_id>', methods=['GET'])
+def get_comment_by_id(comment_id):
+    comment = Comment.query.get_or_404(comment_id)
+    comment_data = {'id': comment.id, 'text': comment.text, 'created_at': comment.created_at, 'user_id': comment.user_id, 'task_id': comment.task_id}
+    return jsonify({'comment': comment_data}), 200
