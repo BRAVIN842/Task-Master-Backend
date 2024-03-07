@@ -228,3 +228,19 @@ def create_comment():
     db.session.commit()
 
     return jsonify({'message': 'Comment created successfully', 'comment_id': comment.id}), 201
+
+# Update a comment
+@app.route('/comments/<int:comment_id>', methods=['PATCH'])
+@jwt_required()
+def update_comment(comment_id):
+    data = request.json
+    text = data.get('text')
+
+    comment = Comment.query.get(comment_id)
+    if not comment:
+        return jsonify({'message': 'Comment not found'}), 404
+
+    comment.text = text
+    db.session.commit()
+
+    return jsonify({'message': 'Comment updated successfully'}), 200
