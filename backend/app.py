@@ -276,3 +276,27 @@ def promote_to_group_leader(user_id):
     db.session.commit()
 
     return jsonify({'message': 'User promoted to group leader'}), 200
+
+# Assign multiple users to a group leader
+@app.route('/group_leaders/<int:group_leader_id>/assign_users', methods=['POST'])
+@jwt_required()
+def assign_users_to_group_leader(group_leader_id):
+    data = request.json
+    user_ids = data.get('user_ids', [])
+
+    # Check if the group leader exists
+    group_leader = GroupLeader.query.get(group_leader_id)
+    if not group_leader:
+        return jsonify({'message': 'Group leader not found'}), 404
+
+    # Assign users to the group leader
+    for user_id in user_ids:
+        user = User.query.get(user_id)
+        if user:
+            user.group_leader_id = group_leader_id
+        else:
+            return jsonify({'message': f'User with ID {user_id} not found'}), 404
+
+    db.session.commit()
+
+    return jsonify({'message': 'Users assigned to group leader successfully'}), 200
