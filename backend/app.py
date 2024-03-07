@@ -210,3 +210,21 @@ def update_user_profile():
     db.session.commit()
 
     return jsonify({'message': 'User profile updated successfully'}), 200
+
+# Create a comment
+@app.route('/comments', methods=['POST'])
+@jwt_required()
+def create_comment():
+    data = request.json
+    text = data.get('text')
+    task_id = data.get('task_id')
+    user_id = get_jwt_identity()
+
+    if not text or not task_id:
+        return jsonify({'message': 'Text and task_id are required'}), 400
+
+    comment = Comment(text=text, task_id=task_id, user_id=user_id)
+    db.session.add(comment)
+    db.session.commit()
+
+    return jsonify({'message': 'Comment created successfully', 'comment_id': comment.id}), 201
