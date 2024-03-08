@@ -86,6 +86,8 @@ def create_task():
 
     return jsonify({'message': 'Task created successfully', 'task': {'id': task.id, 'title': task.title, 'description': task.description, 'deadline': task.deadline, 'progress': task.progress, 'priority': task.priority, 'completed': task.completed, 'created_at': task.created_at}}), 201
 
+from flask_jwt_extended import jwt_required, get_jwt_identity
+
 @app.route('/tasks', methods=['GET'])
 @jwt_required()
 def get_user_tasks():
@@ -97,7 +99,13 @@ def get_user_tasks():
     # Construct a list of task data
     tasks_data = []
     for task in user_tasks:
+        # Get user information including group leader
+        user = task.user
+
+        # Construct task comments data
         task_comments = [{'id': comment.id, 'text': comment.text, 'created_at': comment.created_at, 'user_id': comment.user_id} for comment in task.comments]
+
+        # Construct task data including user and group leader information
         task_data = {
             'id': task.id,
             'title': task.title,
@@ -108,9 +116,14 @@ def get_user_tasks():
             'priority': task.priority,
             'completed': task.completed,
             'user_id': task.user_id,
-            'group_leader_id': task.group_leader_id,
+            'group_leader_id': None,  # Default to None
             'comments': task_comments
         }
+
+        # If user has a group leader, add group leader ID to task data
+        if user.group_leader:
+            task_data['group_leader_id'] = user.group_leader_id
+
         tasks_data.append(task_data)
 
     return jsonify({'tasks': tasks_data}), 200
@@ -125,8 +138,13 @@ def get_task_by_id_endpoint(task_id):
     # Query the task by ID and user ID
     task = Task.query.filter_by(id=task_id, user_id=user_id).first_or_404()
 
-    # Construct task data as before
+    # Get user information including group leader
+    user = task.user
+
+    # Construct task comments data
     task_comments = [{'id': comment.id, 'text': comment.text, 'created_at': comment.created_at, 'user_id': comment.user_id} for comment in task.comments]
+
+    # Construct task data including user and group leader information
     task_data = {
         'id': task.id,
         'title': task.title,
@@ -137,10 +155,14 @@ def get_task_by_id_endpoint(task_id):
         'priority': task.priority,
         'completed': task.completed,
         'user_id': task.user_id,
-        'group_leader_id': task.group_leader_id,
+        'group_leader_id': None,  # Default to None
         'comments': task_comments
     }
-    
+
+    # If user has a group leader, add group leader ID to task data
+    if user.group_leader:
+        task_data['group_leader_id'] = user.group_leader_id
+
     return jsonify({'task': task_data}), 200
 
 # Update a task
@@ -204,7 +226,13 @@ def get_all_tasks():
     tasks_data = []
 
     for task in tasks:
+        # Get user information including group leader
+        user = task.user
+
+        # Construct task comments data
         task_comments = [{'id': comment.id, 'text': comment.text, 'created_at': comment.created_at, 'user_id': comment.user_id} for comment in task.comments]
+
+        # Construct task data including user and group leader information
         task_data = {
             'id': task.id,
             'title': task.title,
@@ -215,19 +243,47 @@ def get_all_tasks():
             'priority': task.priority,
             'completed': task.completed,
             'user_id': task.user_id,
-            'group_leader_id': task.group_leader_id,  # Include group_leader_id here
-            'comments': task_comments
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'profile_image': user.profile_image
+            },
+            'group_leader': None  # Default to None
         }
+
+        # If user has a group leader, add group leader information to task data
+        if user.group_leader:
+            task_data['group_leader'] = {
+                'id': user.group_leader.id,
+                'username': user.group_leader.username,
+                'email': user.group_leader.email,
+                'profile_image': user.group_leader.profile_image
+            }
+
         tasks_data.append(task_data)
 
     return jsonify({'tasks': tasks_data}), 200
 
 # Assuming Task model has a column named 'group_leader_id'
 
+from flask_jwt_extended import jwt_required, get_jwt_identity
+
 @app.route('/all-tasks/<int:task_id>', methods=['GET'])
+@jwt_required()
 def get_task_by_id(task_id):
-    task = Task.query.get_or_404(task_id)
+    user_id = get_jwt_identity()  # Get the ID of the authenticated user
+
+    # Query the task by ID and user ID
+    task = Task.query.filter_by(id=task_id, user_id=user_id).first_or_404()
+
+    # Get user information including group leader
+    user = task.user
+
+    # Construct task comments data
     task_comments = [{'id': comment.id, 'text': comment.text, 'created_at': comment.created_at, 'user_id': comment.user_id} for comment in task.comments]
+
+    # Construct task data including user and group leader information
     task_data = {
         'id': task.id,
         'title': task.title,
@@ -238,10 +294,14 @@ def get_task_by_id(task_id):
         'priority': task.priority,
         'completed': task.completed,
         'user_id': task.user_id,
-        'group_leader_id': task.group_leader_id,  # Include group_leader_id here
+        'group_leader_id': None,  # Default to None
         'comments': task_comments
     }
-    
+
+    # If user has a group leader, add group leader ID to task data
+    if user.group_leader:
+        task_data['group_leader_id'] = user.group_leader_id
+
     return jsonify({'task': task_data}), 200
 
 # Get user profile
