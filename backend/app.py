@@ -16,6 +16,7 @@ bcrypt = Bcrypt(app)
 jwt = JWTManager(app)
 CORS(app)
 
+
 # Continue with endpoints and other configurations
 
 @app.route('/register', methods=['POST'])
@@ -86,7 +87,6 @@ def create_task():
 
     return jsonify({'message': 'Task created successfully', 'task': {'id': task.id, 'title': task.title, 'description': task.description, 'deadline': task.deadline, 'progress': task.progress, 'priority': task.priority, 'completed': task.completed, 'created_at': task.created_at}}), 201
 
-from flask_jwt_extended import jwt_required, get_jwt_identity
 
 @app.route('/tasks', methods=['GET'])
 @jwt_required()
@@ -127,8 +127,6 @@ def get_user_tasks():
         tasks_data.append(task_data)
 
     return jsonify({'tasks': tasks_data}), 200
-
-from flask_jwt_extended import jwt_required, get_jwt_identity
 
 @app.route('/tasks/<int:task_id>', methods=['GET'])
 @jwt_required()
@@ -249,33 +247,19 @@ def get_all_tasks():
                 'email': user.email,
                 'profile_image': user.profile_image
             },
-            'group_leader': None  # Default to None
+            'group_leader': None,  # Default to None
+            'comments': task_comments  # Add comments data
         }
-
-        # If user has a group leader, add group leader information to task data
-        if user.group_leader:
-            task_data['group_leader'] = {
-                'id': user.group_leader.id,
-                'username': user.group_leader.username,
-                'email': user.group_leader.email,
-                'profile_image': user.group_leader.profile_image
-            }
-
         tasks_data.append(task_data)
 
     return jsonify({'tasks': tasks_data}), 200
 
-# Assuming Task model has a column named 'group_leader_id'
 
-from flask_jwt_extended import jwt_required, get_jwt_identity
 
 @app.route('/all-tasks/<int:task_id>', methods=['GET'])
-@jwt_required()
 def get_task_by_id(task_id):
-    user_id = get_jwt_identity()  # Get the ID of the authenticated user
-
-    # Query the task by ID and user ID
-    task = Task.query.filter_by(id=task_id, user_id=user_id).first_or_404()
+    # Query the task by ID
+    task = Task.query.get_or_404(task_id)
 
     # Get user information including group leader
     user = task.user
@@ -364,23 +348,57 @@ def promote_to_group_leader(user_id):
     return jsonify({'message': 'User promoted to group leader'}), 200
 
 
-# Create a comment
+# # Create a comment
+# @app.route('/comments', methods=['POST'])
+# @jwt_required()
+# def create_comment():
+#     data = request.json
+#     text = data.get('text')
+#     task_id = data.get('task_id')
+#     user_id = get_jwt_identity()
+
+#     if not text or not task_id:
+#         return jsonify({'message': 'Text and task_id are required'}), 400
+
+#     comment = Comment(text=text, task_id=task_id, user_id=user_id)
+#     db.session.add(comment)
+#     db.session.commit()
+
+#     return jsonify({'message': 'Comment created successfully', 'comment_id': comment.id}), 201
+
+# When creating a comment
 @app.route('/comments', methods=['POST'])
 @jwt_required()
 def create_comment():
-    data = request.json
-    text = data.get('text')
-    task_id = data.get('task_id')
-    user_id = get_jwt_identity()
+    user_id = get_jwt_identity()  # Get the ID of the authenticated user
+    data = request.get_json()
 
-    if not text or not task_id:
-        return jsonify({'message': 'Text and task_id are required'}), 400
-
-    comment = Comment(text=text, task_id=task_id, user_id=user_id)
+    # Create the comment and associate it with the user ID
+    comment = Comment(text=data['text'], user_id=user_id, task_id=data['task_id'])
     db.session.add(comment)
     db.session.commit()
 
-    return jsonify({'message': 'Comment created successfully', 'comment_id': comment.id}), 201
+    return jsonify({'message': 'Comment created successfully'}), 201
+
+
+# When deleting a comment
+@app.route('/comments/<int:comment_id>', methods=['DELETE'])
+@jwt_required()
+def delete_comment(comment_id):
+    user_id = get_jwt_identity()  # Get the ID of the authenticated user
+
+    # Query the comment by ID
+    comment = Comment.query.get_or_404(comment_id)
+
+    # Check if the authenticated user is the owner of the comment
+    if comment.user_id != user_id:
+        return jsonify({'error': 'You are not authorized to delete this comment'}), 403
+
+    # Delete the comment
+    db.session.delete(comment)
+    db.session.commit()
+
+    return jsonify({'message': 'Comment deleted successfully'}), 200
 
 # Update a comment
 @app.route('/comments/<int:comment_id>', methods=['PATCH'])
@@ -398,18 +416,18 @@ def update_comment(comment_id):
 
     return jsonify({'message': 'Comment updated successfully'}), 200
 
-# Delete a comment
-@app.route('/comments/<int:comment_id>', methods=['DELETE'])
-@jwt_required()
-def delete_comment(comment_id):
-    comment = Comment.query.get(comment_id)
-    if not comment:
-        return jsonify({'message': 'Comment not found'}), 404
+# # Delete a comment
+# @app.route('/comments/<int:comment_id>', methods=['DELETE'])
+# @jwt_required()
+# def delete_comment(comment_id):
+#     comment = Comment.query.get(comment_id)
+#     if not comment:
+#         return jsonify({'message': 'Comment not found'}), 404
 
-    db.session.delete(comment)
-    db.session.commit()
+#     db.session.delete(comment)
+#     db.session.commit()
 
-    return jsonify({'message': 'Comment deleted successfully'}), 200
+#     return jsonify({'message': 'Comment deleted successfully'}), 200
 
 # Edit a task assigned by a group leader to a user
 @app.route('/group_leaders/<int:group_leader_id>/users/<int:user_id>/tasks/<int:task_id>', methods=['PATCH'])
