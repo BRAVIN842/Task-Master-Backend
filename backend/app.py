@@ -1,15 +1,25 @@
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_cors import CORS
 from models import db, User, Task, Comment, GroupLeader
-from datetime import datetime
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_SECRET_KEY'] = 'super-secret'  
+
+# SMTP configuration
+SMTP_HOST = 'smtp.elasticemail.com'
+SMTP_PORT = 2525
+SMTP_USERNAME = 'onsasebravin853@gmail.com'
+SMTP_PASSWORD = 'C00CDC762A095AE842C3D13FBE7A2AA99E52'
+SMTP_SENDER_EMAIL = 'onsasebravin853@gmail.com'
 
 db.init_app(app)
 bcrypt = Bcrypt(app)
@@ -17,7 +27,51 @@ jwt = JWTManager(app)
 CORS(app)
 
 
-# Continue with endpoints and other configurations
+@app.route('/email-notification', methods=['POST'])
+@jwt_required()  # Ensure the request is authenticated
+def email_notification():
+    try:
+        # Get the current user ID
+        current_user_id = get_jwt_identity()
+
+        # Get the user from the database
+        user = User.query.get(current_user_id)
+        if not user:
+            return jsonify({'message': 'User not found'}), 404
+
+        # Check if the user has opted in for email notifications
+        if not user.email_notification_enabled:
+            return jsonify({'message': 'Email notifications are not enabled for this user'}), 400
+
+        # Get the tasks nearing their deadlines for the user
+        approaching_tasks = []
+        today = datetime.utcnow()
+        deadline_threshold = today + timedelta(days=1)  # Consider tasks with deadline within 24 hours
+        for task in user.tasks:
+            if not task.completed and task.deadline <= deadline_threshold:
+                approaching_tasks.append(task)
+
+        # Send email notifications for approaching tasks
+        smtp_server = smtplib.SMTP(SMTP_HOST, SMTP_PORT)
+        smtp_server.starttls()
+        smtp_server.login(SMTP_USERNAME, SMTP_PASSWORD)
+
+        for task in approaching_tasks:
+            msg = MIMEMultipart()
+            msg['From'] = SMTP_SENDER_EMAIL
+            msg['To'] = user.email
+            msg['Subject'] = 'Task Deadline Notification'
+            task_title = task.title
+            deadline_date = task.deadline.strftime('%Y-%m-%d')
+            body = f"This is a notification email to remind you of an approaching task deadline.\n\nTask: {task_title}\nDeadline: {deadline_date}"
+            msg.attach(MIMEText(body, 'plain'))
+            smtp_server.send_message(msg)
+
+        smtp_server.quit()
+
+        return jsonify({'message': 'Email notifications sent successfully'}), 200
+    except Exception as e:
+        return jsonify({'message': f'Failed to send email notifications: {str(e)}'}), 500
 
 @app.route('/register', methods=['POST'])
 def register():
