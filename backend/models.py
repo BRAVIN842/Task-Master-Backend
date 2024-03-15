@@ -10,6 +10,7 @@ class User(db.Model):
     password = db.Column(db.String(100), nullable=False)
     profile_image = db.Column(db.String(100))
     group_leader_id = db.Column(db.Integer, db.ForeignKey('group_leader.id'))
+    email_notification_enabled = db.Column(db.Boolean, nullable=False, default=True)  # Add this line
 
     tasks = db.relationship('Task', backref='user', lazy=True)
     comments = db.relationship('Comment', backref='user', lazy=True)
