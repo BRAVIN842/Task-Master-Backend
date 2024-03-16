@@ -148,11 +148,11 @@ def get_user_tasks():
     user_id = get_jwt_identity()  # Get the ID of the authenticated user
 
     # Query all tasks associated with the authenticated user
-    user_tasks = Task.query.filter_by(user_id=user_id).all()
+    user_tasks = Task.query.filter_by(user_id=user_id).paginate(page=request.args.get('page', 1, type=int), per_page=10)
 
     # Construct a list of task data
     tasks_data = []
-    for task in user_tasks:
+    for task in user_tasks.items:
         # Get user information including group leader
         user = task.user
 
@@ -180,7 +180,7 @@ def get_user_tasks():
 
         tasks_data.append(task_data)
 
-    return jsonify({'tasks': tasks_data}), 200
+    return jsonify({'tasks': tasks_data, 'total_tasks': user_tasks.total, 'current_page': user_tasks.page, 'per_page': user_tasks.per_page}), 200
 
 @app.route('/tasks/<int:task_id>', methods=['GET'])
 @jwt_required()
@@ -272,12 +272,13 @@ def delete_task(task_id):
 
     return jsonify({'message': 'Task and associated comments deleted successfully'}), 200
 
+
 @app.route('/all-tasks', methods=['GET'])
 def get_all_tasks():
-    tasks = Task.query.all()
-    tasks_data = []
+    tasks = Task.query.paginate(page=request.args.get('page', 1, type=int), per_page=10)
 
-    for task in tasks:
+    tasks_data = []
+    for task in tasks.items:
         # Get user information including group leader
         user = task.user
 
@@ -306,7 +307,7 @@ def get_all_tasks():
         }
         tasks_data.append(task_data)
 
-    return jsonify({'tasks': tasks_data}), 200
+    return jsonify({'tasks': tasks_data, 'total_tasks': tasks.total, 'current_page': tasks.page, 'per_page': tasks.per_page}), 200
 
 
 
