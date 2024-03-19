@@ -120,7 +120,7 @@ def create_task():
     title = data.get('title')
     description = data.get('description')
     deadline_str = data.get('deadline')
-    progress = data.get('progress', 0)  # Default progress is 0
+    progress = min(int(data.get('progress', 0)), 100)  # Default progress is 0
     priority = data.get('priority', 'normal')  # Default priority is 'normal'
     user_id = get_jwt_identity()
 
@@ -148,7 +148,7 @@ def get_user_tasks():
     user_id = get_jwt_identity()  # Get the ID of the authenticated user
 
     # Query all tasks associated with the authenticated user
-    user_tasks = Task.query.filter_by(user_id=user_id).paginate(page=request.args.get('page', 1, type=int), per_page=10)
+    user_tasks = Task.query.filter_by(user_id=user_id).paginate(page=request.args.get('page', 1, type=int), per_page=5)
 
     # Construct a list of task data
     tasks_data = []
@@ -230,7 +230,7 @@ def update_task(task_id):
     title = data.get('title')
     description = data.get('description')
     deadline_str = data.get('deadline')
-    progress = data.get('progress')
+    progress = min(int(data.get('progress', 0)), 100)
     priority = data.get('priority')
 
     if title:
@@ -275,7 +275,7 @@ def delete_task(task_id):
 
 @app.route('/all-tasks', methods=['GET'])
 def get_all_tasks():
-    tasks = Task.query.paginate(page=request.args.get('page', 1, type=int), per_page=10)
+    tasks = Task.query.paginate(page=request.args.get('page', 1, type=int), per_page=5)
 
     tasks_data = []
     for task in tasks.items:
@@ -482,7 +482,7 @@ def edit_task_assigned_by_group_leader(group_leader_id, user_id, task_id):
             return jsonify({'message': 'Invalid deadline format. Use YYYY-MM-DD'}), 400
         task.deadline = deadline
     if 'progress' in data:
-        task.progress = data['progress']
+        task.progress = min(data['progress'], 100)
     if 'priority' in data:
         task.priority = data['priority']
     if 'completed' in data:
